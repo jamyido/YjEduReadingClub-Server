@@ -1,0 +1,456 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户性别枚举
+enum Gender {
+  UNKNOWN
+  MALE
+  FEMALE
+}
+
+// 用户角色枚举
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// 账号状态枚举
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+// 圈子成员角色枚举
+enum CircleMemberRole {
+  MEMBER
+  MODERATOR
+  OWNER
+}
+
+// 帖子类型枚举
+enum PostType {
+  TEXT
+  IMAGE
+  VIDEO
+  LINK
+}
+
+// 消息类型枚举
+enum MessageType {
+  TEXT
+  IMAGE
+}
+
+// 通知类型枚举
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  SYSTEM
+  CIRCLE_INVITE
+  TASK
+}
+
+// 用户表
+// 支持手机号+密码登录，以及微信小程序登录后绑定手机号
+model User {
+  id             Int        @id @default(autoincrement())
+  // 手机号，唯一索引，登录凭证
+  phone          String     @unique @db.VarChar(20)
+  // 登录密码（bcrypt 哈希）
+  password       String?    @db.VarChar(255)
+  // 微信小程序 openid
+  weappOpenId    String?    @unique @map("weapp_open_id") @db.VarChar(100)
+  // 微信 unionid（多应用互通）
+  unionId        String?    @unique @map("union_id") @db.VarChar(100)
+  // 昵称
+  nickname       String     @db.VarChar(50)
+  // 头像 URL
+  avatar         String?    @db.Text
+  // 个人简介
+  bio            String?    @db.VarChar(500)
+  // 性别
+  gender         Gender     @default(UNKNOWN)
+  // 生日
+  birthday       DateTime?  @db.Date
+  // 用户角色
+  role           UserRole   @default(USER)
+  // 账号状态
+  status         UserStatus @default(ACTIVE)
+  // 连续打卡天数
+  streakDays     Int        @default(0) @map("streak_days")
+  // 最后打卡日期
+  lastCheckInAt  DateTime?  @map("last_check_in_at")
+  // 关注数
+  followingCount Int        @default(0) @map("following_count")
+  // 粉丝数
+  followerCount  Int        @default(0) @map("follower_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  ownedCircles     Circle[]         @relation("CircleOwner")
+  circleMembers    CircleMember[]
+  posts            Post[]
+  comments         Comment[]
+  likes            Like[]
+  checkIns         CheckIn[]
+  sentMessages     Message[]        @relation("MessageSender")
+  receivedMessages Message[]        @relation("MessageReceiver")
+  notifications    Notification[]
+  followsFollowing Follow[]         @relation("FollowFollowing")
+  followsFollower  Follow[]         @relation("FollowFollower")
+  coursesCreated   Course[]         @relation("CourseCreator")
+  courseProgresses CourseProgress[]
+
+  @@map("users")
+}
+
+// 圈子表
+model Circle {
+  id          Int     @id @default(autoincrement())
+  // 圈子名称
+  name        String  @db.VarChar(100)
+  // 圈子简介
+  description String? @db.Text
+  // 封面图 URL
+  cover       String? @db.Text
+  // 主题色
+  themeColor  String? @map("theme_color") @db.VarChar(20)
+  // 是否公开
+  isPublic    Boolean @default(true) @map("is_public")
+  // 成员数
+  memberCount Int     @default(0) @map("member_count")
+  // 帖子数
+  postCount   Int     @default(0) @map("post_count")
+  // 创建者 ID
+  ownerId     Int     @map("owner_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  owner   User           @relation("CircleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members CircleMember[]
+  posts   Post[]
+  courses Course[]
+
+  @@map("circles")
+}
+
+// 圈子成员关联表
+model CircleMember {
+  id       Int              @id @default(autoincrement())
+  userId   Int              @map("user_id")
+  circleId Int              @map("circle_id")
+  role     CircleMemberRole @default(MEMBER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, circleId])
+  @@map("circle_members")
+}
+
+// 话题表
+// 每个新帖子必须关联一个有效话题；旧帖子允许在迁移后暂时没有话题。
+model Topic {
+  id          Int     @id @default(autoincrement())
+  // 稳定业务标识，代码通过 slug 识别系统话题，避免依赖自增 ID 或可修改标题。
+  slug        String  @unique @db.VarChar(80)
+  title       String  @unique @db.VarChar(50)
+  description String? @db.VarChar(500)
+  // 状态：0 停用 1 启用
+  status      Int     @default(1)
+  // 发现页排序权重，数值越大越靠前。
+  sort        Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  posts Post[]
+
+  @@map("topics")
+}
+
+// 帖子表
+model Post {
+  id           Int      @id @default(autoincrement())
+  // 作者 ID
+  authorId     Int      @map("author_id")
+  // 所属圈子 ID
+  circleId     Int?     @map("circle_id")
+  // 所属话题 ID；为兼容迁移前的旧帖子暂时允许为空，新帖子由服务层保证必填。
+  topicId      Int?     @map("topic_id")
+  // 帖子类型
+  type         PostType @default(TEXT)
+  // 标题
+  title        String?  @db.VarChar(200)
+  // 正文内容
+  content      String   @db.Text
+  // 链接（针对 LINK 类型）
+  linkUrl      String?  @map("link_url") @db.Text
+  // 点赞数
+  likeCount    Int      @default(0) @map("like_count")
+  // 评论数
+  commentCount Int      @default(0) @map("comment_count")
+  // 分享数
+  shareCount   Int      @default(0) @map("share_count")
+  // 是否置顶
+  isPinned     Boolean  @default(false) @map("is_pinned")
+  // 是否精华
+  isEssence    Boolean  @default(false) @map("is_essence")
+  // 状态：0 正常 1 删除 2 审核中
+  status       Int      @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  author   User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  circle   Circle?     @relation(fields: [circleId], references: [id], onDelete: SetNull)
+  topic    Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  medias   PostMedia[]
+  comments Comment[]
+  likes    Like[]
+  checkIn  CheckIn?
+
+  @@index([topicId, createdAt])
+  @@index([circleId, status, authorId, createdAt])
+  @@map("posts")
+}
+
+// 帖子媒体资源表
+model PostMedia {
+  id     Int    @id @default(autoincrement())
+  postId Int    @map("post_id")
+  // 媒体类型：image / video
+  type   String @db.VarChar(20)
+  // 资源 URL
+  url    String @db.Text
+  // 排序
+  sort   Int    @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_medias")
+}
+
+// 评论表
+// 支持一级评论与二级回复
+model Comment {
+  id        Int    @id @default(autoincrement())
+  postId    Int    @map("post_id")
+  authorId  Int    @map("author_id")
+  // 父评论 ID（二级回复）
+  parentId  Int?   @map("parent_id")
+  // 被回复用户 ID
+  replyToId Int?   @map("reply_to_id")
+  content   String @db.Text
+  likeCount Int    @default(0) @map("like_count")
+  status    Int    @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+// 点赞表
+// 对帖子或评论点赞
+model Like {
+  id         Int    @id @default(autoincrement())
+  userId     Int    @map("user_id")
+  // 点赞目标类型：post / comment
+  targetType String @map("target_type") @db.VarChar(20)
+  // 点赞目标 ID
+  targetId   Int    @map("target_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@map("likes")
+}
+
+// 私信消息表
+model Message {
+  id         Int         @id @default(autoincrement())
+  senderId   Int         @map("sender_id")
+  receiverId Int         @map("receiver_id")
+  type       MessageType @default(TEXT)
+  content    String      @db.Text
+  // 是否已读
+  isRead     Boolean     @default(false) @map("is_read")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// 通知表
+model Notification {
+  id         Int              @id @default(autoincrement())
+  userId     Int              @map("user_id")
+  type       NotificationType
+  // 触发者 ID
+  actorId    Int?             @map("actor_id")
+  // 关联目标类型
+  targetType String?          @map("target_type") @db.VarChar(20)
+  // 关联目标 ID
+  targetId   Int?             @map("target_id")
+  // 通知标题
+  title      String           @db.VarChar(200)
+  // 通知内容
+  content    String?          @db.Text
+  // 是否已读
+  isRead     Boolean          @default(false) @map("is_read")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+// 关注表
+model Follow {
+  id          Int @id @default(autoincrement())
+  followerId  Int @map("follower_id")
+  followingId Int @map("following_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("FollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// 打卡记录表
+model CheckIn {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @map("user_id")
+  // 触发本次打卡的帖子；旧的独立打卡记录允许为空。
+  postId      Int?    @unique @map("post_id")
+  // Asia/Shanghai 业务日期，格式 YYYY-MM-DD；旧记录允许为空。
+  checkInDate String? @map("check_in_date") @db.Char(10)
+  // 圈子 ID，可选（全局打卡或圈子打卡）
+  circleId    Int?    @map("circle_id")
+  // 打卡内容
+  content     String? @db.Text
+  // 打卡图片
+  images      String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, checkInDate])
+  @@index([userId, createdAt])
+  @@map("check_ins")
+}
+
+// 课程表
+model Course {
+  id           Int     @id @default(autoincrement())
+  // 课程标题
+  title        String  @db.VarChar(200)
+  // 课程描述
+  description  String? @db.Text
+  // 封面图
+  cover        String? @db.Text
+  // 所属圈子 ID
+  circleId     Int?    @map("circle_id")
+  // 创建者 ID
+  creatorId    Int     @map("creator_id")
+  // 状态：0 草稿 1 已发布 2 已下架
+  status       Int     @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  creator    User             @relation("CourseCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  circle     Circle?          @relation(fields: [circleId], references: [id], onDelete: SetNull)
+  chapters   CourseChapter[]
+  progresses CourseProgress[]
+
+  @@map("courses")
+}
+
+// 课程章节表
+model CourseChapter {
+  id       Int     @id @default(autoincrement())
+  courseId Int     @map("course_id")
+  // 章节标题
+  title    String  @db.VarChar(200)
+  // 内容（富文本或视频链接）
+  content  String? @db.Text
+  // 视频 URL
+  videoUrl String? @map("video_url") @db.Text
+  // 排序
+  sort     Int     @default(0)
+  // 学习时长（分钟）
+  duration Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("course_chapters")
+}
+
+// 课程学习进度表
+model CourseProgress {
+  id                  Int     @id @default(autoincrement())
+  userId              Int     @map("user_id")
+  courseId            Int     @map("course_id")
+  // 当前学习章节 ID
+  currentChapterId    Int?    @map("current_chapter_id")
+  // 已完成章节 ID 列表（JSON 数组）
+  completedChapterIds String? @map("completed_chapter_ids") @db.Text
+  // 进度百分比 0-100
+  progress            Int     @default(0)
+  // 是否完成
+  isCompleted         Boolean @default(false) @map("is_completed")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("course_progresses")
+}
