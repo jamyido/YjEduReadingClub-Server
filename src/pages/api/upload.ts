@@ -106,6 +106,38 @@ function parseMultipartFormData(req: NextApiRequest): Promise<{
   })
 }
 
+/**
+ * 推导后端服务根目录（即 server/ 目录）的绝对路径。
+ *
+ * 上传接口原本使用 process.cwd() 拼接 public/uploads，但 process.cwd()
+ * 取决于启动 Next.js 进程时的工作目录。若部署时未从 server/ 目录启动
+ * （例如从项目根目录或通过 PM2/Docker 指定其他 cwd），写入路径会偏离
+ * server/public/uploads，而 Next.js 静态文件服务始终从 server/public/
+ * 读取，导致访问 /uploads/* 返回 404。
+ *
+ * 这里改为从 __dirname 向上查找同时包含 public/ 与 package.json 的
+ * 祖先目录，确保 dev 与 production build 两种模式下都能定位到 server/。
+ * @returns server/ 目录绝对路径
+ */
+function getServerRoot(): string {
+  var current = __dirname
+  var i = 0
+  while (current && i < 10) {
+    if (fs.existsSync(path.join(current, 'public')) &&
+        fs.existsSync(path.join(current, 'package.json'))) {
+      return current
+    }
+    var parent = path.dirname(current)
+    if (parent === current) {
+      break
+    }
+    current = parent
+    i++
+  }
+  // 兜底回退到 process.cwd()，保留原有行为
+  return process.cwd()
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse<UploadData>>
@@ -162,9 +194,13 @@ export default async function handler(
     }
     var uniqueName = kind + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10) + ext
 
-    // 每个用户使用独立目录：public/uploads/{userId}/
+    // 每个用户使用独立目录：uploads/{userId}/
+    // 上传目录放在 server/uploads/（即项目根目录下的 uploads/，不在 public/ 下），
+    // 由 pages/api/uploads/[...path].ts 路由实时读取返回（对外 /uploads/* 路径
+    // 经 next.config.js rewrite 到 /api/uploads/*），避免 Next.js dev 模式下
+    // public/ 静态文件缓存导致 400。
     var userDirectory = String(user.id)
-    var uploadDir = path.join(process.cwd(), 'public', 'uploads', userDirectory)
+    var uploadDir = path.join(getServerRoot(), 'uploads', userDirectory)
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true })
     }
