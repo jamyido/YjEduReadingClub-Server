@@ -1,47 +1,35 @@
-dist/
-deploy_versions/
-.temp/
-.rn_temp/
-node_modules/
-.DS_Store
-.swc
-*.local
+# 环境变量
+# .env.development 与 .env.production 为团队共享配置模板，纳入版本控制。
+# 个人本地覆盖文件（.env / .env.local / .env.{env}.local）忽略。
+.env.development
+.env.production
 
-dist_weapp/
-dist_h5/
+# 编译产物
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# 环境配置生成产物（由 scripts/gen-env.js 自动生成）
-src/lib/env.ts
+# 测试覆盖率
+*.test
+*.out
+coverage.txt
 
-Temp/
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# Dependencies
-node_modules/
-.pnp
-pnp.js
-# Testing
-coverage
-# Next.js build output
-.next/
-out/
-# Production build
-build
-# Miscellaneous
-DS_Store
-*.pem
-# Debug logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-# Environment variables
-env
-env.local
-env.*.local
-# Vercel deployment files
-vercel
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-public/uploads/
+# 上传文件目录
 uploads/
+
+# 依赖目录（Go Modules 本地缓存）
+vendor/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db

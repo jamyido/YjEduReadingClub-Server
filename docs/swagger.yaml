@@ -1,0 +1,1849 @@
+basePath: /api
+definitions:
+  yjedu-reading-club-server_internal_pkg_response.ApiError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  yjedu-reading-club-server_internal_pkg_response.ApiResponse:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiError'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+host: localhost:3100
+info:
+  contact: {}
+  description: |-
+    嘉阅圈私域社群平台后端服务，提供内容社区、互动打卡、小组交流、私信通知、知识课程等核心能力。
+    统一响应格式：{"success":bool,"data":any,"message":string,"error":{"code":string,"message":string}}
+  title: 嘉阅圈后端 API
+  version: "1.0"
+paths:
+  /admin/scheduler/trigger:
+    post:
+      consumes:
+      - application/json
+      description: 需登录且需管理员。手动触发定时总结任务（daily/weekly/monthly），任务在独立协程中异步执行，接口立即返回，执行结果通过服务日志查看。
+      parameters:
+      - description: 任务类型（daily/weekly/monthly）
+        in: query
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: type 参数必须为 daily / weekly / monthly
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 仅平台管理员可触发定时任务
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 触发定时任务
+      tags:
+      - 管理后台-定时任务
+  /ai-conversations:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。分页查询当前用户的 AI 共读会话列表。
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: AI 共读会话列表
+      tags:
+      - AI 共读
+  /ai-conversations/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。返回会话详情与消息历史，仅会话所属用户可访问。
+      parameters:
+      - description: 会话 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 会话 ID 必须是正整数
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 无权访问该会话
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 会话不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: AI 共读会话详情
+      tags:
+      - AI 共读
+  /ai-conversations/{id}/messages:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。存储用户消息，调用配置的 AI provider（Coze / DeepSeek 等）获取 AI 回复，存储 AI 消息并返回两条消息；调用
+        AI 失败时用户消息仍保留，AI 消息返回错误提示文本；单条消息不能超过 5000 字。
+      parameters:
+      - description: 会话 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 消息请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或消息内容为空
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 无权在该会话中发送消息
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 会话不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 发送 AI 消息
+      tags:
+      - AI 共读
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。用户通过原密码验证身份后设置新密码，新密码需通过强度校验且不能与原密码相同。
+      parameters:
+      - description: 修改密码请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 参数缺失或新密码不合规
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 原密码错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 修改密码
+      tags:
+      - 认证
+  /auth/change-phone:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。用户通过密码验证身份后更换手机号，新手机号需通过格式校验、不能与原手机号相同且未被其他账号占用。
+      parameters:
+      - description: 更换手机号请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 手机号格式不正确或与原手机号相同
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 密码错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 该手机号已被其他账号占用
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 更换手机号
+      tags:
+      - 认证
+  /auth/login/phone:
+    post:
+      consumes:
+      - application/json
+      description: H5 端使用手机号 + 密码登录，返回 JWT Token 与用户公开信息。
+      parameters:
+      - description: 登录请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 手机号格式不正确
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 手机号或密码错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 账号已被封禁
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 手机号密码登录
+      tags:
+      - 认证
+  /auth/me:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。返回当前登录用户的公开信息、是否已设置密码、未读私信数与未读通知数。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取当前用户信息
+      tags:
+      - 认证
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 公开接口。使用手机号 + 密码注册新用户，可选携带 tempToken 绑定微信 openid，注册成功后返回 JWT 与用户公开信息。
+      parameters:
+      - description: 注册请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 手机号格式不正确或密码强度不足
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 临时凭证无效或已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 手机号已注册或微信已绑定其他账号
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 手机号注册
+      tags:
+      - 认证
+  /auth/set-password:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。为微信登录的无密码用户补充设置密码，密码需通过强度校验；设置成功后重新签发 Token 并通过 X-New-Token
+        响应头下发。
+      parameters:
+      - description: 设置密码请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 密码强度不足或账号已设置密码
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 设置密码
+      tags:
+      - 认证
+  /auth/weapp/bind:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。已通过手机号密码登录的用户携带微信登录第一步下发的 tempToken，将微信 openid 绑定到当前账号；openid
+        已被其他账号占用时拒绝。
+      parameters:
+      - description: 绑定请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 缺少 tempToken 参数
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 临时凭证无效或已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 该微信已绑定其他账号
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 绑定微信到当前账号
+      tags:
+      - 认证
+  /auth/weapp/login:
+    post:
+      consumes:
+      - application/json
+      description: 公开接口。微信小程序使用 code 调用 jscode2session 换取 openid，openid 已存在则直接登录并返回
+        JWT，否则签发临时 Token 引导前端授权手机号。
+      parameters:
+      - description: 登录请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 缺少 code 参数或微信登录失败
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 微信小程序登录第一步
+      tags:
+      - 认证
+  /auth/weapp/phone:
+    post:
+      consumes:
+      - application/json
+      description: 公开接口。使用临时 Token 与 getPhoneNumber 下发的 code 获取手机号，手机号已注册则绑定 openid，否则创建新用户，最终返回
+        JWT 与用户公开信息。
+      parameters:
+      - description: 授权手机号请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 缺少参数或获取手机号失败
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 临时凭证无效或已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 微信小程序登录第二步
+      tags:
+      - 认证
+  /checkin:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。分页查询打卡记录，可按用户 ID 与圈子 ID 过滤。
+      parameters:
+      - description: 用户 ID
+        format: int64
+        in: query
+        name: userId
+        type: integer
+      - description: 圈子 ID
+        format: int64
+        in: query
+        name: circleId
+        type: integer
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 打卡记录列表
+      tags:
+      - 打卡
+    post:
+      consumes:
+      - application/json
+      description: 需登录。兼容旧客户端入口，委托 PostService 创建打卡挑战帖子，并在同一事务计算连续天数；同一用户同一圈子每日仅可打卡一次。
+      parameters:
+      - description: 打卡请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或圈子 ID 不合法
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 今日已打卡
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 打卡记录创建失败
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 创建打卡
+      tags:
+      - 打卡
+  /circles:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。支持按关键词搜索与按拥有者过滤，返回分页的圈子列表。
+      parameters:
+      - description: 名称或描述关键词
+        in: query
+        name: keyword
+        type: string
+      - description: 拥有者用户 ID
+        in: query
+        name: ownerId
+        type: integer
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 分页查询圈子列表
+      tags:
+      - 圈子
+    post:
+      consumes:
+      - application/json
+      description: 需登录且需平台管理员权限。创建圈子后自动将当前管理员以 OWNER 角色加入并初始化成员计数为 1。
+      parameters:
+      - description: 创建圈子请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或名称不合规
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 仅平台管理员可创建圈子
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 创建圈子
+      tags:
+      - 圈子
+  /circles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 需登录。仅圈子拥有者或平台管理员可删除圈子，删除成功后返回 deleted=true。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的圈子 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 只有圈子拥有者或管理员才能删除圈子
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 删除圈子
+      tags:
+      - 圈子
+    get:
+      consumes:
+      - application/json
+      description: 公开接口，可选登录。返回圈子详情，非成员或非管理员时隐藏成员名单。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的圈子 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取圈子详情
+      tags:
+      - 圈子
+    put:
+      consumes:
+      - application/json
+      description: 需登录。仅圈子拥有者或平台管理员可更新圈子信息，更新成功后返回最新详情。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新圈子请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或无效的圈子 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 只有圈子拥有者或管理员才能更新圈子信息
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 更新圈子
+      tags:
+      - 圈子
+  /circles/{id}/join:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。当前用户以 MEMBER 角色加入指定圈子，已加入则返回 409，加入成功后成员计数 +1。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的圈子 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 已经是该圈子的成员
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 加入圈子
+      tags:
+      - 圈子
+  /circles/{id}/leave:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。当前用户退出指定圈子，退出后成员计数 -1；圈子拥有者不可退出，需先转让圈子。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的圈子 ID 或圈子拥有者不能退出
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 您不是该圈子的成员
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 退出圈子
+      tags:
+      - 圈子
+  /circles/{id}/members/{userId}/role:
+    put:
+      consumes:
+      - application/json
+      description: 需登录。仅圈子拥有者或平台管理员可变更成员角色，角色取值为 MEMBER / MODERATOR / OWNER；任命为 OWNER
+        时执行拥有权转让，且不能变更自己的角色。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 目标用户 ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      - description: 更新角色请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的 ID、不能变更自己的角色或无效的角色取值
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 只有圈子拥有者或管理员才能变更成员角色
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 该用户不是圈子成员
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 更新圈子成员角色
+      tags:
+      - 圈子
+  /circles/{id}/post-days-ranking:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。仅圈子成员或平台管理员可访问，按累计发帖天数降序返回成员排行，默认每页 50 条。
+      parameters:
+      - description: 圈子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 50，最大 100
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的圈子 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 加入圈子后才能查看累计发帖天数排行榜
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取圈子累计发帖天数排行榜
+      tags:
+      - 圈子
+  /circles/mine:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。返回当前登录用户已加入的圈子列表。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取当前用户已加入的圈子
+      tags:
+      - 圈子
+  /courses:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。分页查询课程列表，可按圈子 ID 与创建者 ID 过滤。
+      parameters:
+      - description: 圈子 ID
+        format: int64
+        in: query
+        name: circleId
+        type: integer
+      - description: 创建者 ID
+        format: int64
+        in: query
+        name: creatorId
+        type: integer
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 课程列表
+      tags:
+      - 课程
+  /courses/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口，可选登录。返回课程详情（含章节），登录用户附带学习进度，未登录时 progress 为 nil。
+      parameters:
+      - description: 课程 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 课程 ID 不合法
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 课程不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 课程详情
+      tags:
+      - 课程
+  /courses/{id}/progress:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。更新当前用户在某课程的学习进度，可传入当前章节、已完成章节列表、进度百分比与是否完成标记。
+      parameters:
+      - description: 课程 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 进度更新请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或课程 ID 不合法
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 课程不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 更新课程学习进度
+      tags:
+      - 课程
+  /messages:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。分页查询当前用户的私信会话列表，支持按 onlyUnread 过滤未读会话。
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20，最大 100
+        in: query
+        name: pageSize
+        type: integer
+      - default: false
+        description: 仅返回未读会话
+        in: query
+        name: onlyUnread
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 私信会话列表
+      tags:
+      - 私信
+  /messages/{userId}:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。分页查询当前用户与指定用户的私聊记录，拉取成功后将对方发来的未读消息标记为已读；不能与自己发起会话。
+      parameters:
+      - description: 对方用户 ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: 每页数量，默认 50，最大 100
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 用户 ID 不合法或不能与自己发起会话
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取会话私聊记录
+      tags:
+      - 私信
+    post:
+      consumes:
+      - application/json
+      description: 需登录。向指定用户发送一条文本私信，不能给自己发送私信；消息内容不能为空。
+      parameters:
+      - description: 对方用户 ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      - description: 发送私信请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 用户 ID 不合法或消息内容为空
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 发送私信
+      tags:
+      - 私信
+  /messages/read-all:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。将当前用户所有未读私信标记为已读，返回标记已读的消息数量。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 全部私信已读
+      tags:
+      - 私信
+  /notifications:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。分页查询当前用户的通知列表，支持按 category 分类（like/reply/system/task）与 onlyUnread
+        过滤。
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20，最大 100
+        in: query
+        name: pageSize
+        type: integer
+      - description: 通知分类：like/reply/system/task
+        in: query
+        name: category
+        type: string
+      - default: false
+        description: 仅返回未读通知
+        in: query
+        name: onlyUnread
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 通知列表
+      tags:
+      - 通知
+  /notifications/dispatch:
+    post:
+      consumes:
+      - application/json
+      description: 需登录 + 需管理员。派发 SYSTEM 或 TASK 通知，支持按 ALL（全体活跃用户）、USERS（指定用户，最多 500
+        个）、CIRCLE（指定圈子）三种接收范围派发；TASK 类型必须包含任务说明内容。
+      parameters:
+      - description: 通知派发请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 参数缺失或校验不通过
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 仅平台管理员可派发系统通知和任务通知
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 圈子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 当前没有可接收通知的用户
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 派发通知
+      tags:
+      - 通知
+  /notifications/read:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。请求体携带 id 时标记该条通知为已读（id 必须为正整数且属于当前用户）；未传 id 时将当前用户所有未读通知标记为已读，返回标记已读的数量。
+      parameters:
+      - description: 标记已读请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 通知 ID 必须是正整数
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 通知不存在或无权操作
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 标记通知已读
+      tags:
+      - 通知
+  /notifications/summary:
+    get:
+      consumes:
+      - application/json
+      description: 需登录。返回当前用户的通知总数及点赞、回复、系统、任务分类的未读数量统计。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 通知汇总
+      tags:
+      - 通知
+  /posts:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口（可选登录）。按圈子、话题、作者、类型筛选分页查询帖子列表；圈子帖子对未登录或非成员仅开放第一页最多 3 条预览，登录用户附点赞态。
+      parameters:
+      - description: 圈子 ID
+        in: query
+        name: circleId
+        type: integer
+      - description: 话题 ID
+        in: query
+        name: topicId
+        type: integer
+      - description: 作者 ID
+        in: query
+        name: authorId
+        type: integer
+      - description: 帖子类型
+        in: query
+        name: type
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 分页查询帖子列表
+      tags:
+      - 帖子
+    post:
+      consumes:
+      - application/json
+      description: 需登录。在指定圈子或话题下创建帖子，支持标题、正文、链接与最多 9 张媒体；委托 PostService 在事务中完成发帖与打卡副作用，成功后异步触发
+        AI 共读流程。
+      parameters:
+      - description: 创建帖子请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或 circleId 缺失
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 无发帖权限
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 创建帖子
+      tags:
+      - 帖子
+  /posts/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 需登录。软删除帖子，仅作者或管理员可删。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 无权删除他人帖子
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 删除帖子
+      tags:
+      - 帖子
+    get:
+      consumes:
+      - application/json
+      description: 公开接口（可选登录）。按 ID 查询帖子详情，圈子帖子需校验成员身份（管理员豁免），登录用户附点赞态。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "403":
+          description: 加入圈子后才能查看完整内容
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 查询帖子详情
+      tags:
+      - 帖子
+  /posts/{id}/ai-conversations:
+    post:
+      consumes:
+      - application/json
+      description: 需登录。创建或获取当前用户对该帖子的 AI 共读会话；若为新建会话，同时派发一条 TASK 通知到消息页任务分类，并返回会话详情与消息历史。
+      parameters:
+      - description: 帖子 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 已存在会话
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "201":
+          description: 新建会话
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 必须是正整数
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 创建或获取 AI 共读会话
+      tags:
+      - AI 共读
+  /posts/{id}/comments:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口（可选登录）。分页查询指定帖子的一级评论。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 分页查询帖子评论
+      tags:
+      - 帖子
+    post:
+      consumes:
+      - application/json
+      description: 需登录。在指定帖子下创建评论，校验父评论与回复目标合法性，并按规则派发通知。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 创建评论请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或父评论不合法
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 创建评论
+      tags:
+      - 帖子
+  /posts/{id}/like:
+    delete:
+      consumes:
+      - application/json
+      description: 需登录。取消点赞帖子。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 尚未点赞该帖子
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 取消点赞
+      tags:
+      - 帖子
+    post:
+      consumes:
+      - application/json
+      description: 需登录。点赞帖子，重复点赞返回 409，并给作者发点赞通知。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 已经点赞过该帖子
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 点赞帖子
+      tags:
+      - 帖子
+  /posts/{id}/share:
+    post:
+      consumes:
+      - application/json
+      description: 公开接口。记录用户打开转发面板的行为，自增帖子转发计数。
+      parameters:
+      - description: 帖子 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 帖子 ID 无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 帖子不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 记录转发统计
+      tags:
+      - 帖子
+  /topics:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。分页查询启用状态的话题列表，附带各话题下的帖子数，支持按 query 关键词搜索话题名称。
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量，默认 20，最大 100
+        in: query
+        name: pageSize
+        type: integer
+      - description: 话题名称搜索关键词
+        in: query
+        name: query
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 话题列表
+      tags:
+      - 话题
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 需登录。接收 multipart/form-data 文件上传，按用户 ID / 圈子 ID 分目录保存；仅支持 JPG、PNG、WebP、GIF
+        图片，单文件不超过 10MB。
+      parameters:
+      - description: 待上传文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      - default: avatar
+        description: 上传用途（avatar/circle/post），默认 avatar
+        in: query
+        name: kind
+        type: string
+      - description: 圈子 ID（kind=circle 且更新已有圈子封面时必传）
+        format: int64
+        in: query
+        name: circleId
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 未接收到上传文件或文件过大或格式不支持
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "500":
+          description: 保存文件失败
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 文件上传
+      tags:
+      - 上传
+  /users/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。返回指定用户的公开主页，包含昵称、头像、简介、性别、连续打卡天数（按业务日期计算）、关注数与粉丝数。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的用户 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 获取用户公开资料
+      tags:
+      - 用户
+  /users/{id}/follow:
+    delete:
+      consumes:
+      - application/json
+      description: 需登录。取消关注指定用户，校验关注关系是否存在，并同步更新双方关注/粉丝计数。
+      parameters:
+      - description: 目标用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的用户 ID 或不能关注自己
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 尚未关注该用户
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 取消关注用户
+      tags:
+      - 用户
+    post:
+      consumes:
+      - application/json
+      description: 需登录。关注指定用户，校验目标用户存在性、防止自我关注与重复关注，并同步更新双方关注/粉丝计数。
+      parameters:
+      - description: 目标用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的用户 ID 或不能关注自己
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "409":
+          description: 已经关注该用户
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 关注用户
+      tags:
+      - 用户
+  /users/{id}/followers:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。分页查询指定用户的粉丝列表，page 默认 1，pageSize 默认 20、上限 100。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，上限 100）
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的用户 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 查询用户粉丝列表
+      tags:
+      - 用户
+  /users/{id}/following:
+    get:
+      consumes:
+      - application/json
+      description: 公开接口。分页查询指定用户的关注列表，page 默认 1，pageSize 默认 20、上限 100。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，上限 100）
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 无效的用户 ID
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 查询用户关注列表
+      tags:
+      - 用户
+  /users/profile:
+    put:
+      consumes:
+      - application/json
+      description: 需登录。仅更新请求体中实际传入的字段，支持昵称、头像、简介、性别与生日；头像需通过持久化 URL 归属校验，性别取值 UNKNOWN/MALE/FEMALE，生日支持
+        RFC3339、ISO 日期或秒级时间戳。
+      parameters:
+      - description: 更新资料请求
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "400":
+          description: 请求参数格式错误或性别/生日/头像取值无效
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+        "401":
+          description: 未登录或登录已过期
+          schema:
+            $ref: '#/definitions/yjedu-reading-club-server_internal_pkg_response.ApiResponse'
+      summary: 更新当前用户资料
+      tags:
+      - 用户
+securityDefinitions:
+  BearerAuth:
+    description: 输入 "Bearer <token>"，token 通过 /api/auth/login/phone 或 /api/auth/weapp/login
+      获取。
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
